@@ -2,6 +2,7 @@ const container = document.querySelector('.chatWrapper');
 const btn = document.getElementById('Addpopups');
 let popupCount = 0;
 
+
 // Load saved state on page load
 window.addEventListener('load', () => {
     const savedState = loadState();
@@ -975,6 +976,56 @@ function autoSortTags() {
                     popup.secondaryTag = createSecondaryTag(popup, newSide);
                     popup.secondaryTagSide = newSide;
                 }
+                saveState();
+            };
+        } else if (!isSecondary && popup) {
+            // ✅ Add click handler for PRIMARY tags (border-tag)
+            tag.onclick = () => {
+                tag.remove();
+                popup.style.display = 'block';
+                popup.closedByTag = false;
+                
+                // Clear any secondary tag reference
+                if (popup.secondaryTag) {
+                    popup.secondaryTag.remove();
+                    popup.secondaryTag = null;
+                    popup.secondaryTagSide = null;
+                }
+                
+                // Find safe position for popup
+                const rect = container.getBoundingClientRect();
+                const pRectNow = popup.getBoundingClientRect();
+                const GAP = 10;
+                
+                const visiblePopups = Array.from(container.querySelectorAll('.Chatpopup'))
+                    .filter(p => p !== popup && p.style.display !== 'none');
+                
+                let newLeft = 40;
+                let newTop = 30;
+                let safe = false;
+                
+                while (!safe) {
+                    safe = true;
+                    for (let other of visiblePopups) {
+                        const oRect = other.getBoundingClientRect();
+                        const overlap =
+                            !(newLeft + pRectNow.width <= oRect.left ||
+                            newLeft >= oRect.right ||
+                            newTop + pRectNow.height <= oRect.top ||
+                            newTop >= oRect.bottom);
+                        
+                        if (overlap) {
+                            newLeft += GAP;
+                            safe = false;
+                            break;
+                        }
+                    }
+                    if (newLeft + pRectNow.width > rect.width) newLeft = 10;
+                    if (newTop + pRectNow.height > rect.height) newTop = 10;
+                }
+                
+                popup.style.left = newLeft + "px";
+                popup.style.top = newTop + "px";
                 saveState();
             };
         }
