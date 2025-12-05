@@ -72,6 +72,24 @@ window.addEventListener('load', () => {
                 }
             });
             
+            // Ensure secondary tags are properly linked to their popups
+            const secondaryTags = Array.from(container.querySelectorAll('.secondary-tag'));
+            secondaryTags.forEach(tag => {
+                const titleText = tag.innerText.replace(/\n/g, '').replace('×', '').trim();
+                const popup = Array.from(container.querySelectorAll('.Chatpopup')).find(p => {
+                    const titleEl = p.querySelector('.popup-title');
+                    return titleEl && titleEl.innerText === titleText;
+                });
+                if (popup && !popup.secondaryTag) {
+                    popup.secondaryTag = tag;
+                    // Extract side from tag's position
+                    if (tag.style.left && parseFloat(tag.style.left) <= 10) popup.secondaryTagSide = 'left';
+                    else if (tag.style.right && parseFloat(tag.style.right) <= 10) popup.secondaryTagSide = 'right';
+                    else if (tag.style.top && parseFloat(tag.style.top) <= 10) popup.secondaryTagSide = 'top';
+                    else if (tag.style.bottom && parseFloat(tag.style.bottom) <= 10) popup.secondaryTagSide = 'bottom';
+                }
+            });
+            
             autoSortTags();
             saveState(); // save sorted state
         }, 300); // small delay to allow DOM render
@@ -96,7 +114,7 @@ setInterval(() => {
 // Save state function
 function saveState() {
     const popups = Array.from(container.querySelectorAll('.Chatpopup'));
-    const tags = Array.from(container.querySelectorAll('.border-tag'))
+    const tags = Array.from(container.querySelectorAll('.border-tag, .secondary-tag'))
         .filter(tag => tag.style.display !== 'none'); // Only save visible tags
 
     const state = {
@@ -114,12 +132,12 @@ function saveState() {
                 secondaryTagSide: popup.secondaryTagSide || null,
                 secondaryTagLeft: popup.secondaryTag?.style.left || null,
                 secondaryTagTop: popup.secondaryTag?.style.top || null,
-                isSortedSecondary: popup.secondaryTag ? true : false // NEW: mark as sorted secondary
+                isSortedSecondary: popup.secondaryTag ? true : false // Mark as sorted secondary
             };
         }),
 
         tags: tags.map(tag => ({
-            text: tag.getAttribute('data-original-text') || tag.innerText.replace(/\n/g, '').replace('×', ''),
+            text: tag.getAttribute('data-original-text') || tag.dataset.originalText || tag.innerText.replace(/\n/g, '').replace('×', ''),
             left: tag.style.left,
             top: tag.style.top,
             right: tag.style.right,
@@ -128,7 +146,11 @@ function saveState() {
             textAlign: tag.style.textAlign,
             background: tag.style.background,
             color: tag.style.color,
-            innerText: tag.innerText.replace('×', '')
+            border: tag.style.border, // Save border for secondary tags
+            borderRadius: tag.style.borderRadius, // Save border radius
+            innerText: tag.innerText.replace('×', ''),
+            isSecondary: tag.classList.contains('secondary-tag'),
+            side: tag.dataset.side || '' // Save side info for secondary tags
         }))
     };
 
@@ -139,7 +161,15 @@ function saveState() {
 // Load state function
 function loadState() {
     const savedState = localStorage.getItem('chatPopupState');
-    return savedState ? JSON.parse(savedState) : null;
+    if (savedState) {
+        try {
+            return JSON.parse(savedState);
+        } catch (e) {
+            console.error('Failed to parse saved state:', e);
+            return null;
+        }
+    }
+    return null;
 }
 
 // Create header markup helper (title + close button) and attach close handler
@@ -318,61 +348,18 @@ function restorePopup(popupData) {
 
     makeDraggable(popup);
 
- 
-
-//  Restore secondary tag ONLY if popup is at border, visible, AND no primary tag exists
-if (popupData.secondaryTagSide && popupData.display !== 'none') {
-    const rect = container.getBoundingClientRect();
-    const pRect = popup.getBoundingClientRect();
-    
-    // Check if a primary tag exists for this popup
-    const titleEl = popup.querySelector('.popup-title');
-    const title = titleEl ? titleEl.innerText : '';
-   const hasPrimaryTag = Array.from(container.querySelectorAll('.border-tag'))
-    .some(tag => {
-        const tagText = tag.getAttribute('data-original-text') || tag.innerText.replace(/\n/g, '').replace('×', '');
-        return tagText === title && tag.style.display !== 'none';
-    });
-    
-    // Only create secondary tag if NO primary tag exists AND popup is visible
-    if (!hasPrimaryTag) {
-        const isAtLeftBorder = popup.offsetLeft <= 0;
-        const isAtRightBorder = popup.offsetLeft + pRect.width >= rect.width;
-        const isAtTopBorder = popup.offsetTop <= 0;
-        const isAtBottomBorder = popup.offsetTop + pRect.height >= rect.height;
-        
-        if (isAtLeftBorder || isAtRightBorder || isAtTopBorder || isAtBottomBorder) {
-            popup.secondaryTagSide = popupData.secondaryTagSide;
-            popup.secondaryTag = createSecondaryTag(popup, popupData.secondaryTagSide);
-            
-            if (popupData.secondaryTagLeft) popup.secondaryTag.style.left = popupData.secondaryTagLeft;
-            if (popupData.secondaryTagTop) popup.secondaryTag.style.top = popupData.secondaryTagTop;
-            
-            popup.secondaryTag.addEventListener('click', () => {
-                popup.style.display = "block";
-                popup.closedByTag = false;
-                popup.secondaryTag.remove();
-                popup.secondaryTag = null;
-                saveState();
-            });
-        } else {
-            popup.secondaryTagSide = null;
-        }
-    } else {
-        // Clear secondary tag data since a primary tag exists
-        popup.secondaryTagSide = null;
-    }
-} else {
-    // Clear secondary tag data if popup was closed
-    popup.secondaryTagSide = null;
-}
-
 }
 
 // Restore tag from saved data
 function restoreTag(tagData) {
     const tag = document.createElement('div');
-    tag.classList.add('border-tag');
+    
+    // Set class based on whether it's secondary
+    if (tagData.isSecondary) {
+        tag.classList.add('secondary-tag');
+    } else {
+        tag.classList.add('border-tag');
+    }
     
     // Create close button for restored tag
     const closeBtn = document.createElement('span');
@@ -394,6 +381,10 @@ function restoreTag(tagData) {
     tag.innerHTML = tagData.innerText;
     tag.appendChild(closeBtn);
     tag.setAttribute('data-original-text', tagData.text);
+    tag.dataset.originalText = tagData.text;
+    if (tagData.side) {
+        tag.dataset.side = tagData.side;
+    }
     
     tag.style.position = "absolute";
     tag.style.padding = "4px 20px 4px 6px"; // More padding on right for close button
@@ -407,6 +398,8 @@ function restoreTag(tagData) {
     tag.style.textAlign = tagData.textAlign;
     tag.style.background = tagData.background;
     tag.style.color = tagData.color;
+    tag.style.border = tagData.border || "1px solid black"; // Restore or apply default border
+    tag.style.borderRadius = tagData.borderRadius || "3px"; // Restore or apply default border radius
     
     container.appendChild(tag);
     
@@ -416,6 +409,12 @@ function restoreTag(tagData) {
         const titleEl = p.querySelector('.popup-title');
         return titleEl && titleEl.innerText === tagData.text;
     });
+    
+    // For secondary tags, link them to popup
+    if (tagData.isSecondary && popup) {
+        popup.secondaryTag = tag;
+        popup.secondaryTagSide = tagData.side;
+    }
     
     // Close button click handler
     closeBtn.addEventListener('click', (e) => {
@@ -432,6 +431,10 @@ function restoreTag(tagData) {
     tag.addEventListener('click', () => {
         const title = tagData.text;
         tag.remove();
+        if (popup) {
+            popup.secondaryTag = null; // Clear reference since tag was removed
+            popup.secondaryTagSide = null;
+        }
         
         // Find the corresponding popup (compare only .popup-title text)
         const popups = Array.from(container.querySelectorAll('.Chatpopup'));
@@ -872,10 +875,24 @@ function autoSortTags() {
     tags.forEach(tag => {
         const text = getTagText(tag);
         const isSecondary = tag.classList.contains('secondary-tag');
+        
+        // Store side information for secondary tags
+        let side = null;
+        if (isSecondary) {
+            if (tag.style.left && parseFloat(tag.style.left) <= 10) side = 'left';
+            else if (tag.style.right && parseFloat(tag.style.right) <= 10) side = 'right';
+            else if (tag.style.top && parseFloat(tag.style.top) <= 10) side = 'top';
+            else if (tag.style.bottom && parseFloat(tag.style.bottom) <= 10) side = 'bottom';
+        }
+        tag.dataset.side = side || '';
 
         if (!tag.dataset.originalText) {
             tag.dataset.originalText = text;
         }
+
+        // Remove old close button if it exists
+        const oldCloseBtn = tag.querySelector('span');
+        if (oldCloseBtn) oldCloseBtn.remove();
 
         tag.innerHTML = '';
         tag.style.whiteSpace = 'nowrap';
@@ -919,18 +936,45 @@ function autoSortTags() {
         };
 
         // ✅ If secondary tag is sorted → hide related popup
- if (isSecondary && popup) {
+        if (isSecondary && popup) {
             popup.style.display = 'none';
             popup.closedByTag = true;
+            popup.secondaryTag = tag; // Link popup to the sorted secondary tag
+            popup.secondaryTagSide = tag.dataset.side;
 
             // Add click handler for secondary tag
             tag.onclick = () => {
                 popup.style.display = 'block';
-                popup.closedByTag = false; 
-                tag.remove(); 
-                     // Recreate the secondary tag for the popup
-        popup.secondaryTag = createSecondaryTag(popup, side);
-        popup.secondaryTagSide = side;
+                popup.closedByTag = false;
+                
+                // Remove the sorted secondary tag
+                tag.remove();
+                
+                // Clear any existing secondary tag reference
+                if (popup.secondaryTag && popup.secondaryTag !== tag) {
+                    popup.secondaryTag.remove();
+                }
+                popup.secondaryTag = null;
+                popup.secondaryTagSide = null;
+                
+                // Only recreate secondary tag if popup is at border
+                const rect = container.getBoundingClientRect();
+                const pRect = popup.getBoundingClientRect();
+                const isAtLeftBorder = popup.offsetLeft <= 0;
+                const isAtRightBorder = popup.offsetLeft + pRect.width >= rect.width;
+                const isAtTopBorder = popup.offsetTop <= 0;
+                const isAtBottomBorder = popup.offsetTop + pRect.height >= rect.height;
+                
+                if (isAtLeftBorder || isAtRightBorder || isAtTopBorder || isAtBottomBorder) {
+                    let newSide = null;
+                    if (isAtLeftBorder) newSide = "right";
+                    else if (isAtRightBorder) newSide = "left";
+                    else if (isAtTopBorder) newSide = "bottom";
+                    else if (isAtBottomBorder) newSide = "top";
+                    
+                    popup.secondaryTag = createSecondaryTag(popup, newSide);
+                    popup.secondaryTagSide = newSide;
+                }
                 saveState();
             };
         }
