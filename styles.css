@@ -1,0 +1,163 @@
+.chatcontainer{
+    width: 95%;
+  /* border: 1px solid black; */
+  height: 800px;
+  top: 6%;
+     position: relative;
+    overflow: hidden; 
+  left: 3%;
+  user-select: none;
+}
+
+
+
+.chatWrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 1;             /* popups inside this layer */
+}
+
+
+#Addpopups {
+    position: fixed; /* stays in place even when scrolling */
+    top: 10px;
+    left: 10px;
+    padding: 8px 16px;
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display:none;
+}
+
+#Addpopups:hover {
+    background-color: #0056b3;
+}
+
+
+.chatcontainer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid #333; /* or your border style */
+    pointer-events: none;
+    z-index: 9999; /* always above popup */
+}
+
+
+ .Chatpopup {
+            width: 155px;
+            height: 100px;
+            background: #fff;
+            border: 1px solid #333;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+             z-index: 10;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            padding: 5px;
+            cursor: move;
+        }
+       .Chatpopup-header {
+            background: #333;
+            color: #fff;
+            padding: 3px 5px;
+            font-size: 14px;
+            cursor: move;
+            width: 100%;
+            margin-left: -3%;
+            margin-top: -4%;
+            text-align: left;
+
+        }
+
+
+        .Chatpopup-body {
+            padding: 5px;
+            font-size: 12px;
+        }
+
+.border-tag {
+    padding: 2px 6px;
+    background: #333;
+    color: #fff;
+    font-size: 11px;
+    border-radius: 4px;
+    position: absolute;
+    white-space: nowrap;
+    font-size: 15px;
+}
+
+
+#Sorttagsbutton{
+    cursor:pointer;
+    width: 50px;
+    position: relative;
+    z-index: 2000;
+}
+
+
+
+#CloseContainerBtn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    background: #113a94;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: background 0.2s;
+}
+
+#CloseContainerBtn:hover {
+    background: #3f5a96;
+}
+
+#OpenContainerBtn {
+    padding: 10px 20px;
+    margin-left: 10px;
+    border: none;
+    border-radius: 4px;
+    background: #113a94;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#OpenContainerBtn:hover {
+    background: #3f5a96;
+}
+
+/* Hide the open button when container is visible */
+.chatcontainer:not([style*="display: none"]) ~ #OpenContainerBtn,
+.chatcontainer:not([style*="display:none"]) ~ #OpenContainerBtn {
+    display: none;
+}
+
+.popup-close,
+.tag-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+
+.popup-close {
+    color: white;
+}
