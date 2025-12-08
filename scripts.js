@@ -345,6 +345,9 @@ function restorePopup(popupData) {
     } else if (headerText.includes("mango")) {
         header.style.background = "#5C4033";
         header.style.color = "#FFFFFF";
+    }else {
+        header.style.background = "#444";
+        header.style.color = "#fff";
     }
 
     makeDraggable(popup);
@@ -551,6 +554,9 @@ function createPopup(title) {
     } else if (headerText.includes("mango")) {
         header.style.background = "#5C4033";
         header.style.color = "#FFFFFF";
+    }else {
+        header.style.background = "#444";
+        header.style.color = "#fff";
     }
     
     makeDraggable(popup);
@@ -876,6 +882,8 @@ function autoSortTags() {
     tags.forEach(tag => {
         const text = getTagText(tag);
         const isSecondary = tag.classList.contains('secondary-tag');
+
+        
         
         // Store side information for secondary tags
         let side = null;
@@ -928,6 +936,21 @@ function autoSortTags() {
         ).find(p =>
             p.querySelector('.popup-title')?.innerText.trim() === text
         );
+
+
+// Apply popup color theme to SORTED secondary tags too
+if (isSecondary && popup) {
+    const header = popup.querySelector('.Chatpopup-header');
+
+    if (header) {
+        tag.style.background = header.style.background;
+        tag.style.color = header.style.color;
+        tag.style.border = "1px solid " + header.style.background; // match border color
+        tag.style.borderRadius = "3px";
+    }
+}
+
+
 
         closeBtn.onclick = e => {
             e.stopPropagation();
