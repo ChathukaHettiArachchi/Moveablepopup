@@ -1107,7 +1107,10 @@ if (isSecondary && popup) {
 }
 
 
-setInterval(() => {
+se
+
+
+tInterval(() => {
     autoSortTags();
 }, 180000);
 
@@ -1210,10 +1213,7 @@ function repositionPopupsOnResize() {
                     } else if (popup.secondaryTagSide === "left") {
                         popup.secondaryTag.style.top = (updatedPRect.top - containerRect.top) + "px";
                         popup.secondaryTag.style.left = (updatedPRect.left - containerRect.left - popup.secondaryTag.offsetWidth) + "px";
-                    } else if (popup.secondaryTagSide === "bottom") {
-                        popup.secondaryTag.style.left = (updatedPRect.left - containerRect.left) + "px";
-                        popup.secondaryTag.style.top = (updatedPRect.bottom - containerRect.top) + "px";
-                    } else if (popup.secondaryTagSide === "top") {
+                    }  else if (popup.secondaryTagSide === "top") {
                         popup.secondaryTag.style.left = (updatedPRect.left - containerRect.left) + "px";
                         popup.secondaryTag.style.top = (updatedPRect.top - containerRect.top - popup.secondaryTag.offsetHeight) + "px";
                     }
