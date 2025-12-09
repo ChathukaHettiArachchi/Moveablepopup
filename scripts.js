@@ -121,8 +121,16 @@ function saveState() {
     const state = {
         popups: popups.map(popup => {
             const titleEl = popup.querySelector('.popup-title');
+            const rect = container.getBoundingClientRect();
+            
+            // Convert to percentages for responsive positioning
+            const leftPercent = (popup.offsetLeft / rect.width) * 100;
+            const topPercent = (popup.offsetTop / rect.height) * 100;
+            
             return {
                 title: titleEl ? titleEl.innerText : popup.querySelector('.Chatpopup-header')?.innerText || '',
+                leftPercent: leftPercent,
+                topPercent: topPercent,
                 left: popup.style.left,
                 top: popup.style.top,
                 display: popup.style.display,
@@ -299,9 +307,9 @@ function createSecondaryTag(popup, side) {
     tag.addEventListener('click', () => {
         popup.style.display = 'block';
         popup.closedByTag = false;
-        tag.remove();
-        popup.secondaryTag = createSecondaryTag(popup, side);
-        popup.secondaryTagSide = side;
+        
+        // Don't remove the tag, just show the popup
+        // The tag will be removed by autoSortTags if needed
         saveState();
     });
 
@@ -314,8 +322,19 @@ function restorePopup(popupData) {
     const popup = document.createElement('div');
     popup.classList.add('Chatpopup');
     popup.style.position = "absolute";
-    popup.style.left = popupData.left || '50px';
-    popup.style.top = popupData.top || '50px';
+    
+    // Use percentage-based positioning if available, otherwise fallback to pixel values
+    if (popupData.leftPercent !== undefined && popupData.topPercent !== undefined) {
+        const rect = container.getBoundingClientRect();
+        popup.style.left = (popupData.leftPercent / 100) * rect.width + 'px';
+        popup.style.top = (popupData.topPercent / 100) * rect.height + 'px';
+        // Store percentages for resize recalculation
+        popup.leftPercent = popupData.leftPercent;
+        popup.topPercent = popupData.topPercent;
+    } else {
+        popup.style.left = popupData.left || '50px';
+        popup.style.top = popupData.top || '50px';
+    }
     
     // Restore the exact display state - only show if it was visible AND not closed by tag
     popup.style.display = popupData.display || 'block';
@@ -589,6 +608,10 @@ function makeDraggable(popup) {
         popup.style.left = x + 'px';
         popup.style.top = y + 'px';
         
+        // Store percentages for responsive resizing
+        popup.leftPercent = (x / rect.width) * 100;
+        popup.topPercent = (y / rect.height) * 100;
+        
         // Check if dragged to edge to create tag
         if (!draggedToEdge) {
             let hitTop = y <= -(pRect.height * 0.8);
@@ -846,7 +869,7 @@ function autoSortTags() {
 
     /* --------------------------------------------------
        STEP 2: Collect tags but REMOVE secondary
-               if primary exists
+               if primary exists - SKIP border-touching secondaries
     -------------------------------------------------- */
     const tags = Array.from(
         container.querySelectorAll('.border-tag, .secondary-tag')
@@ -863,6 +886,16 @@ function autoSortTags() {
             ) {
                 tag.remove(); // optional but recommended
                 return false;
+            }
+            
+            // SKIP secondary tags that are actively linked to popups at borders
+            if (tag.classList.contains('secondary-tag')) {
+                const popup = Array.from(container.querySelectorAll('.Chatpopup'))
+                    .find(p => p.secondaryTag === tag);
+                if (popup && popup.style.display === 'none' && popup.closedByTag !== true) {
+                    // This is an active secondary tag from a popup at border, skip it
+                    return false;
+                }
             }
 
             return true;
@@ -1107,10 +1140,7 @@ if (isSecondary && popup) {
 }
 
 
-se
-
-
-tInterval(() => {
+setInterval(() => {
     autoSortTags();
 }, 180000);
 
@@ -1119,6 +1149,9 @@ function clearSavedState() {
     localStorage.removeItem('chatPopupState');
     console.log('Saved state cleared');
 }
+
+
+
 
 
 // Add this code after your other window event listeners
@@ -1141,33 +1174,55 @@ function repositionPopupsOnResize() {
     popups.forEach(popup => {
         if (popup.style.display === 'none') return;
         
-        const pRect = popup.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
+        const popupWidth = popup.offsetWidth;
+        const popupHeight = popup.offsetHeight;
+        let popupLeft = popup.offsetLeft;
+        let popupTop = popup.offsetTop;
         
-        let left = popup.offsetLeft;
-        let top = popup.offsetTop;
-        let needsRepositioning = false;
+        // Check if popup is at a border BEFORE repositioning
+        const threshold = 5;
+        const wasAtLeftBorder = popupLeft <= threshold;
+        const wasAtRightBorder = popupLeft + popupWidth >= rect.width - threshold;
+        const wasAtTopBorder = popupTop <= threshold;
+        const wasAtBottomBorder = popupTop + popupHeight >= rect.height - threshold;
         
-        // Keep popup within right boundary
-        if (left + pRect.width > rect.width) {
-            left = Math.max(0, rect.width - pRect.width);
-            popup.style.left = left + 'px';
-            needsRepositioning = true;
+        // Use stored percentages to recalculate responsive positions
+        if (popup.leftPercent !== undefined && popup.topPercent !== undefined) {
+            let newLeft = (popup.leftPercent / 100) * rect.width;
+            let newTop = (popup.topPercent / 100) * rect.height;
+            
+            // If popup was at a border, keep it at that border
+            if (wasAtLeftBorder) {
+                newLeft = 0;
+            } else if (wasAtRightBorder) {
+                newLeft = Math.max(0, rect.width - popupWidth);
+            }
+            
+            if (wasAtTopBorder) {
+                newTop = 0;
+            } else if (wasAtBottomBorder) {
+                newTop = Math.max(0, rect.height - popupHeight);
+            }
+            
+            // Keep popup within boundaries if not at border
+            if (!wasAtLeftBorder && !wasAtRightBorder && newLeft + popupWidth > rect.width) {
+                newLeft = Math.max(0, rect.width - popupWidth);
+            }
+            if (!wasAtTopBorder && !wasAtBottomBorder && newTop + popupHeight > rect.height) {
+                newTop = Math.max(0, rect.height - popupHeight);
+            }
+            
+            popupLeft = newLeft;
+            popupTop = newTop;
+            popup.style.left = newLeft + 'px';
+            popup.style.top = newTop + 'px';
         }
         
-        // Keep popup within bottom boundary
-        if (top + pRect.height > rect.height) {
-            top = Math.max(0, rect.height - pRect.height);
-            popup.style.top = top + 'px';
-            needsRepositioning = true;
-        }
-        
-        // After repositioning, check if popup is now at a border and needs secondary tag
-        const updatedPRect = popup.getBoundingClientRect();
-        const isAtLeftBorder = popup.offsetLeft <= 0;
-        const isAtRightBorder = popup.offsetLeft + updatedPRect.width >= rect.width;
-        const isAtTopBorder = popup.offsetTop <= 0;
-        const isAtBottomBorder = popup.offsetTop + updatedPRect.height >= rect.height;
+        // Check border collisions with small threshold
+        const isAtLeftBorder = popupLeft <= threshold;
+        const isAtRightBorder = popupLeft + popupWidth >= rect.width - threshold;
+        const isAtTopBorder = popupTop <= threshold;
+        const isAtBottomBorder = popupTop + popupHeight >= rect.height - threshold;
         
         // Check if there's a primary tag for this popup
         const titleEl = popup.querySelector('.popup-title');
@@ -1180,43 +1235,51 @@ function repositionPopupsOnResize() {
         
         // Only manage secondary tags if NO primary tag exists
         if (!hasPrimaryTag) {
-            // Remove existing secondary tag if popup moved away from all borders
-            if (!isAtLeftBorder && !isAtRightBorder && !isAtTopBorder && !isAtBottomBorder) {
-                if (popup.secondaryTag) {
-                    popup.secondaryTag.remove();
-                    popup.secondaryTag = null;
-                    popup.secondaryTagSide = null;
-                }
-            } else {
-                // Popup is at a border - create or update secondary tag
-                let newSide = null;
-                
-                if (isAtLeftBorder) newSide = "right";
-                else if (isAtRightBorder) newSide = "left";
-                else if (isAtTopBorder) newSide = "bottom";
-                else if (isAtBottomBorder) newSide = "top";
-                
-                // If side changed or no secondary tag exists, recreate it
-                if (newSide && (!popup.secondaryTag || popup.secondaryTagSide !== newSide)) {
+            // Determine which side the popup is touching (if any)
+            let newSide = null;
+            
+            if (isAtLeftBorder) newSide = "right";
+            else if (isAtRightBorder) newSide = "left";
+            else if (isAtTopBorder) newSide = "bottom";
+            // SKIP BOTTOM BORDER - don't create secondary tag
+            
+            if (newSide) {
+                // Popup IS at a border - ensure secondary tag exists
+                if (!popup.secondaryTag || popup.secondaryTagSide !== newSide) {
+                    // Remove old tag if side changed
                     if (popup.secondaryTag) {
                         popup.secondaryTag.remove();
                     }
+                    // Create new secondary tag
                     popup.secondaryTag = createSecondaryTag(popup, newSide);
                     popup.secondaryTagSide = newSide;
                 }
                 
-                // Update secondary tag position
+                // Always update secondary tag position during resize
                 if (popup.secondaryTag) {
+                    const tagWidth = popup.secondaryTag.offsetWidth;
+                    const tagHeight = popup.secondaryTag.offsetHeight;
+                    
                     if (popup.secondaryTagSide === "right") {
-                        popup.secondaryTag.style.top = (updatedPRect.top - containerRect.top) + "px";
-                        popup.secondaryTag.style.left = (updatedPRect.right - containerRect.left) + "px";
+                        popup.secondaryTag.style.top = popupTop + "px";
+                        popup.secondaryTag.style.left = (popupLeft + popupWidth) + "px";
                     } else if (popup.secondaryTagSide === "left") {
-                        popup.secondaryTag.style.top = (updatedPRect.top - containerRect.top) + "px";
-                        popup.secondaryTag.style.left = (updatedPRect.left - containerRect.left - popup.secondaryTag.offsetWidth) + "px";
-                    }  else if (popup.secondaryTagSide === "top") {
-                        popup.secondaryTag.style.left = (updatedPRect.left - containerRect.left) + "px";
-                        popup.secondaryTag.style.top = (updatedPRect.top - containerRect.top - popup.secondaryTag.offsetHeight) + "px";
+                        popup.secondaryTag.style.top = popupTop + "px";
+                        popup.secondaryTag.style.left = (popupLeft - tagWidth) + "px";
+                    } else if (popup.secondaryTagSide === "bottom") {
+                        popup.secondaryTag.style.left = popupLeft + "px";
+                        popup.secondaryTag.style.top = (popupTop + popupHeight) + "px";
+                    } else if (popup.secondaryTagSide === "top") {
+                        popup.secondaryTag.style.left = popupLeft + "px";
+                        popup.secondaryTag.style.top = (popupTop - tagHeight) + "px";
                     }
+                }
+            } else {
+                // Popup is NOT at any border - remove secondary tag if exists
+                if (popup.secondaryTag) {
+                    popup.secondaryTag.remove();
+                    popup.secondaryTag = null;
+                    popup.secondaryTagSide = null;
                 }
             }
         } else {
