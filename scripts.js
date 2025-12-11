@@ -662,6 +662,14 @@ function makeDraggable(popup) {
             const containerRect = container.getBoundingClientRect();
             popup.secondaryTag.style.left = pRect.left - containerRect.left + "px";
             popup.secondaryTag.style.top = pRect.bottom - containerRect.top + "px";
+        } else if (y + pRect.height >= rect.height) {
+            if (!popup.secondaryTag) {
+                popup.secondaryTag = createSecondaryTag(popup, "top");
+            }
+            const pRect = popup.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            popup.secondaryTag.style.left = pRect.left - containerRect.left + "px";
+            popup.secondaryTag.style.top = (pRect.top - containerRect.top - popup.secondaryTag.offsetHeight) + "px";
         } else {
             if (popup.secondaryTag) {
                 popup.secondaryTag.remove();
@@ -1241,7 +1249,7 @@ function repositionPopupsOnResize() {
             if (isAtLeftBorder) newSide = "right";
             else if (isAtRightBorder) newSide = "left";
             else if (isAtTopBorder) newSide = "bottom";
-            // SKIP BOTTOM BORDER - don't create secondary tag
+            else if (isAtBottomBorder) newSide = "top";
             
             if (newSide) {
                 // Popup IS at a border - ensure secondary tag exists
