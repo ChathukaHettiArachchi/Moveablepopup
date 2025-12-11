@@ -2,6 +2,71 @@ const container = document.querySelector('.chatWrapper');
 const btn = document.getElementById('Addpopups');
 let popupCount = 0;
 
+// Helper function to get color based on popup title
+function getPopupColor(title) {
+    const headerText = (title || '').toLowerCase();
+    
+    // 21 fruits with unique colors
+    if (headerText.includes("papaya")) {
+        return { background: "#8B0000", color: "#FFFFFF" }; // Dark Red
+    } else if (headerText.includes("apple")) {
+        return { background: "#00008B", color: "#FFFFFF" }; // Dark Blue
+    } else if (headerText.includes("mango")) {
+        return { background: "#5C4033", color: "#FFFFFF" }; // Brown
+    } else if (headerText.includes("banana")) {
+        return { background: "rgb(51, 51, 49)", color: "#FFFFFF" }; // Gold
+    } else if (headerText.includes("orange")) {
+        return { background: "#FF8C00", color: "#FFFFFF" }; // Dark Orange
+    } else if (headerText.includes("grape")) {
+        return { background: "#6F0B93", color: "#FFFFFF" }; // Purple
+    } else if (headerText.includes("strawberry")) {
+        return { background: "#E30B5C", color: "#FFFFFF" }; // Pink-Red
+    } else if (headerText.includes("pineapple")) {
+        return { background: "#FFA500", color: "#FFFFFF" }; // Orange
+    } else if (headerText.includes("watermelon")) {
+        return { background: "#008000", color: "#FFFFFF" }; // Green
+    } else if (headerText.includes("blueberry")) {
+        return { background: "#4169E1", color: "#FFFFFF" }; // Royal Blue
+    } else if (headerText.includes("raspberry")) {
+        return { background: "#C72C48", color: "#FFFFFF" }; // Raspberry Red
+    } else if (headerText.includes("peach")) {
+        return { background: "#683e08ff", color: "#FFFFFF" }; // Peach
+    } else if (headerText.includes("pear")) {
+        return { background: "#7CB342", color: "#FFFFFF" }; // Light Green
+    } else if (headerText.includes("cherry")) {
+        return { background: "#C41E3A", color: "#FFFFFF" }; // Cherry Red
+    } else if (headerText.includes("lemon")) {
+        return { background: "#94da12ff", color: "#FFFFFF" }; // Bright Yellow
+    } else if (headerText.includes("lime")) {
+        return { background: "#32CD32", color: "#FFFFFF" }; // Lime Green
+    } else if (headerText.includes("kiwi")) {
+        return { background: "#8B7355", color: "#FFFFFF" }; // Brown
+    } else if (headerText.includes("pomegranate")) {
+        return { background: "#DC143C", color: "#FFFFFF" }; // Crimson
+    } else if (headerText.includes("avocado")) {
+        return { background: "#556B2F", color: "#FFFFFF" }; // Dark Olive
+    } else if (headerText.includes("cantaloupe")) {
+        return { background: "#FF9500", color: "#FFFFFF" }; // Cantaloupe Orange
+    } else if (headerText.includes("rambutan")) {
+        return { background: "#8B0000", color: "#FFFFFF" }; // Dark Red
+    } else if (headerText.includes("apricot")) {
+        return { background: "#FFA500", color: "#FFFFFF" }; // Apricot Orange
+    } else if (headerText.includes("mangosteen")) {
+        return { background: "#8B008B", color: "#FFFFFF" }; // Dark Magenta
+    } else if (headerText.includes("durian")) {
+        return { background: "#D4AF37", color: "#FFFFFF" }; // Gold
+    } else if (headerText.includes("dragon fruit")) {
+        return { background: "#FF1493", color: "#FFFFFF" }; // Deep Pink
+    } else {
+        return { background: "#444", color: "#fff" }; // Default Gray
+    }
+}
+
+
+// //  REMOVE OLD MEMORY ON EVERY PAGE LOAD
+// localStorage.removeItem('chatPopupState');
+// console.log("Previous popup memory cleared!");
+
 
 // Load saved state on page load
 window.addEventListener('load', () => {
@@ -99,6 +164,28 @@ window.addEventListener('load', () => {
         createPopup("Apple");
         createPopup("Papaya");
         createPopup("Mango");
+        createPopup("Orange");
+createPopup("Grapes");
+createPopup("Strawberry");
+createPopup("Pineapple");
+createPopup("Watermelon");
+createPopup("Blueberry");
+createPopup("Raspberry");
+createPopup("Peach");
+createPopup("Pear");
+createPopup("Cherry");
+createPopup("Lemon");
+createPopup("Lime");
+createPopup("Kiwi");
+createPopup("Pomegranate");
+createPopup("Avocado");
+createPopup("Cantaloupe");
+createPopup("Rambutan");
+createPopup("Apricot");
+createPopup("Mangosteen");
+createPopup("Durian");
+createPopup("Dragon Fruit");
+
     }
 });
 
@@ -352,22 +439,9 @@ function restorePopup(popupData) {
     
     container.appendChild(popup);
     
-    const headerText = (popup.querySelector('.popup-title')?.innerText || '').toLowerCase();
-    
-    // Apply color styling based on title
-    if (headerText.includes("papaya")) {
-        header.style.background = "#8B0000";
-        header.style.color = "#FFFFFF";
-    } else if (headerText.includes("apple")) {
-        header.style.background = "#00008B";
-        header.style.color = "#FFFFFF";
-    } else if (headerText.includes("mango")) {
-        header.style.background = "#5C4033";
-        header.style.color = "#FFFFFF";
-    }else {
-        header.style.background = "#444";
-        header.style.color = "#fff";
-    }
+    const colors = getPopupColor(popupData.title);
+    header.style.background = colors.background;
+    header.style.color = colors.color;
 
     makeDraggable(popup);
 
@@ -533,7 +607,8 @@ window.addEventListener('load', () => {
     }
 });
 
-const POPUP_GAP = 10;
+const POPUP_GAP = 40;
+const POPUPS_PER_ROW = 9;
 
 function createPopup(title) {
     const popup = document.createElement('div');
@@ -541,16 +616,23 @@ function createPopup(title) {
     popup.style.position = "absolute";
     
     const existingPopups = Array.from(container.querySelectorAll('.Chatpopup'));
-    let newLeft = POPUP_GAP;
+    const popupIndex = existingPopups.length;
     
-    if (existingPopups.length > 0) {
-        const lastPopup = existingPopups[existingPopups.length - 1];
-        const lastRect = lastPopup.getBoundingClientRect();
-        newLeft = lastRect.right - container.getBoundingClientRect().left + POPUP_GAP;
-    }
+    // Calculate row and column position
+    const row = Math.floor(popupIndex / POPUPS_PER_ROW);
+    const col = popupIndex % POPUPS_PER_ROW;
     
-    popup.style.left = newLeft + 50 + "px";
-    popup.style.top = POPUP_GAP + 30 + "px";
+    // Fixed popup width and height
+    const POPUP_WIDTH = 155;
+    const POPUP_HEIGHT = 100;
+    const ROW_HEIGHT = POPUP_HEIGHT + POPUP_GAP * 3;
+    
+    // Calculate position
+    const newLeft = POPUP_GAP + (col * (POPUP_WIDTH + POPUP_GAP));
+    const newTop = POPUP_GAP + 30 + (row * ROW_HEIGHT);
+    
+    popup.style.left = newLeft + "px";
+    popup.style.top = newTop + "px";
     popup.closedByTag = false; // Initialize flag
     
     // header (title + close) and body
@@ -562,21 +644,9 @@ function createPopup(title) {
     
     container.appendChild(popup);
     
-    const headerText = title.toLowerCase();
-    
-    if (headerText.includes("papaya")) {
-        header.style.background = "#8B0000";
-        header.style.color = "#FFFFFF";
-    } else if (headerText.includes("apple")) {
-        header.style.background = "#00008B";
-        header.style.color = "#FFFFFF";
-    } else if (headerText.includes("mango")) {
-        header.style.background = "#5C4033";
-        header.style.color = "#FFFFFF";
-    }else {
-        header.style.background = "#444";
-        header.style.color = "#fff";
-    }
+    const colors = getPopupColor(title);
+    header.style.background = colors.background;
+    header.style.color = colors.color;
     
     makeDraggable(popup);
 }
@@ -725,20 +795,9 @@ function createTag(popup, top, bottom, left, right) {
     tag.style.cursor = "pointer";
     tag.style.fontSize = "12px";
     
-    const headerText = title.toLowerCase();
-    if (headerText.includes("papaya")) {
-        tag.style.background = "#8B0000";
-        tag.style.color = "#FFFFFF";
-    } else if (headerText.includes("apple")) {
-        tag.style.background = "#00008B";
-        tag.style.color = "#FFFFFF";
-    } else if (headerText.includes("mango")) {
-        tag.style.background = "#5C4033";
-        tag.style.color = "#FFFFFF";
-    } else {
-        tag.style.background = "#444";
-        tag.style.color = "#fff";
-    }
+    const colors = getPopupColor(title);
+    tag.style.background = colors.background;
+    tag.style.color = colors.color;
     
     const rect = container.getBoundingClientRect();
     const sortButton = document.getElementById('Sorttagsbutton');
