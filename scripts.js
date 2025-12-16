@@ -1069,7 +1069,7 @@ function autoSortTags() {
             };
         }
 
-        // Clockwise placement
+        // Clockwise placement - simple sequential without jumping
         if (pos.top + tag.offsetWidth <= rect.width - START_OFFSET) {
             tag.style.top = '1px';
             tag.style.left = pos.top + 'px';
