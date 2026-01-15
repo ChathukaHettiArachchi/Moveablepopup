@@ -1,5 +1,6 @@
 const container = document.querySelector('.popupscrollarea');
 const tagContainer = document.querySelector('.chatWrapper');
+const hitContainer = document.querySelector('.chatcontainer');
 const btn = document.getElementById('Addpopups');
 let popupCount = 0;
 
@@ -443,6 +444,12 @@ window.addEventListener('load', () => {
             });
             
             autoSortTags();
+            
+            // Restore scroll position
+            if (savedState.scrollTop) {
+                container.scrollTop = savedState.scrollTop;
+            }
+            
             saveState();
         }, 300);
     } else {
@@ -477,6 +484,7 @@ function saveState() {
 
     const rect = container.getBoundingClientRect();
     const state = {
+        scrollTop: container.scrollTop,  // Save scroll position
         popups: popups.map(popup => {
             const titleEl = popup.querySelector('.popup-title');
             return {
@@ -564,6 +572,11 @@ function createSecondaryTag(popup, side) {
     popup.secondaryTagSide = side;
 
     tag.innerText = (side === "top" || side === "bottom") ? title : [...title].join("\n");
+    
+    // IMPORTANT: Store the original text IMMEDIATELY so sorting works correctly
+    tag.setAttribute('data-original-text', title);
+    tag.dataset.originalText = title;
+    tag.dataset.side = side;
     
     // For left side, swap close button and title positions
     let cssText = `
@@ -807,6 +820,7 @@ function makeDraggable(popup) {
         let x = e.clientX - offsetX;
         let y = e.clientY - offsetY;
         const rect = container.getBoundingClientRect();
+        const hitRect = hitContainer.getBoundingClientRect();
         const pRect = popup.getBoundingClientRect();
         
         popup.style.left = x + 'px';
@@ -814,27 +828,36 @@ function makeDraggable(popup) {
         popup.leftPercent = (x / rect.width) * 100;
         popup.topPercent = (y / rect.height) * 100;
         
-        // Check if dragged to edge to create tag
-        if (!draggedToEdge) {
-            let hitTop = y <= -(pRect.height * 0.8);
-            let hitBottom = y >= rect.height - (pRect.height * 0.2);
-            let hitLeft = x <= -(pRect.width * 0.8);
-            let hitRight = x >= rect.width - (pRect.width * 0.2);
-            
-            if (hitTop || hitBottom || hitLeft || hitRight) {
-                createTag(popup, hitTop, hitBottom, hitLeft, hitRight);
-                if (hitLeft) popup.style.left = "0px";
-                if (hitRight) popup.style.left = (rect.width - pRect.width) + "px";
-                if (hitTop) popup.style.top = "0px";
-                if (hitBottom) popup.style.top = (rect.height - pRect.height) + "px";
-                popup.style.display = "none";
-                draggedToEdge = true;
-                popup.closedByTag = false;
-                saveState();
-            }
-        }
+        // Check if dragged to edge to create tag - use hitContainer (chatcontainer) boundaries
+        // Check if dragged to edge to create tag - SCROLL-AWARE
+if (!draggedToEdge) {
+
+    const scrollTop = container.scrollTop;
+
+    const visualY = y - scrollTop;
+
+    const hitTop = visualY <= -(pRect.height * 0.8);
+    const hitBottom = visualY >= hitRect.height - (pRect.height * 0.2);
+    const hitLeft = x <= -(pRect.width * 0.8);
+    const hitRight = x >= hitRect.width - (pRect.width * 0.2);
+
+    if (hitTop || hitBottom || hitLeft || hitRight) {
+        createTag(popup, hitTop, hitBottom, hitLeft, hitRight);
+
+        if (hitLeft) popup.style.left = "0px";
+        if (hitRight) popup.style.left = (hitRect.width - pRect.width) + "px";
+        if (hitTop) popup.style.top = "0px";
+        if (hitBottom) popup.style.top = (hitRect.height - pRect.height) + "px";
+
+        popup.style.display = "none";
+        draggedToEdge = true;
+        popup.closedByTag = false;
+        saveState();
+    }
+}
+
         
-        // Manage secondary tag visuals
+        // Manage secondary tag visuals - but don't create if border tag will be created
         const secondaryTagMap = {
             left: { side: 'right', left: pRect.right - rect.left, top: pRect.top - rect.top },
             right: { side: 'left', left: pRect.left - rect.left - (popup.secondaryTag?.offsetWidth || 0), top: pRect.top - rect.top },
@@ -842,13 +865,19 @@ function makeDraggable(popup) {
             bottom: { side: 'top', left: pRect.left - rect.left, top: pRect.top - rect.top - (popup.secondaryTag?.offsetHeight || 0) }
         };
         
-        let condition = null;
-        if (x <= 0) condition = 'left';
-        else if (x + pRect.width >= rect.width) condition = 'right';
-        else if (y <= 0) condition = 'top';
-        else if (y + pRect.height >= rect.height) condition = 'bottom';
+        const scrollTop = container.scrollTop;
+const visualY = y - scrollTop;
+
+let condition = null;
+
+if (x <= 0) condition = 'left';
+else if (x + pRect.width >= rect.width) condition = 'right';
+else if (visualY <= 0) condition = 'top';
+else if (visualY + pRect.height >= rect.height) condition = 'bottom';
+
         
-        if (condition) {
+        // Don't create secondary tag after border tag is created
+        if (condition && !draggedToEdge) {
             if (!popup.secondaryTag) {
                 popup.secondaryTag = createSecondaryTag(popup, secondaryTagMap[condition].side);
             }
@@ -876,6 +905,13 @@ function createTag(popup, top, bottom, left, right) {
     const title = titleEl ? titleEl.innerText : popup.querySelector('.Chatpopup-header')?.innerText || '';
     const tag = document.createElement('div');
     tag.classList.add('border-tag');
+    
+    // Remove secondary tag if it exists
+    if (popup.secondaryTag) {
+        popup.secondaryTag.remove();
+        popup.secondaryTag = null;
+        popup.secondaryTagSide = null;
+    }
     
     const closeBtn = createCloseButton();
     tag.innerHTML = (left || right) ? [...title].join("\n") : title;
@@ -983,6 +1019,7 @@ function createTag(popup, top, bottom, left, right) {
         tag.remove();
         popup.style.display = "block";
         popup.closedByTag = false;
+        popup.wasConvertedFromTag = true;  // Mark as converted from tag
         const pos = findFirstEmptyGridSlot(popup);
         popup.style.left = pos.left + "px";
         popup.style.top = pos.top + "px";
@@ -1016,21 +1053,37 @@ function autoSortTags() {
                 return false;
             }
             
-            if (tag.classList.contains('secondary-tag')) {
+            // All visible secondary tags should be included for sorting and converted to border tags
+            // No filtering based on popup display state needed
+            
+            // Don't include tags that were converted back to popups
+            if (tag.classList.contains('border-tag')) {
                 const popup = Array.from(container.querySelectorAll('.Chatpopup'))
-                    .find(p => p.secondaryTag === tag);
-                if (popup && popup.style.display === 'none' && popup.closedByTag !== true) return false;
+                    .find(p => {
+                        const titleEl = p.querySelector('.popup-title') || p.querySelector('.Chatpopup-header');
+                        return titleEl && titleEl.innerText === title;
+                    });
+                if (popup && popup.wasConvertedFromTag) {
+                    popup.wasConvertedFromTag = false;
+                    return false;
+                }
             }
+            
             return true;
         });
 
-    // Separate fruit tags and group tags
-    const fruitTags = [];
-    const groupTags = [];
+    // First, sort ALL tags alphabetically
     const fruitNames = ["Banana", "Apple", "Papaya", "Mango", "Orange", "Grapes", "Strawberry", "Pineapple", 
                         "Watermelon", "Blueberry", "Raspberry", "Peach", "Pear", "Cherry", "Lemon", "Lime", 
                         "Kiwi", "Pomegranate", "Avocado", "Cantaloupe", "Rambutan", "Apricot", "Mangosteen", 
                         "Durian", "Dragonfruit"];
+    
+    // Sort ALL tags alphabetically first
+    allTags.sort((a, b) => getTagText(a).localeCompare(getTagText(b)));
+    
+    // Now separate into fruit and group arrays while maintaining alphabetical order
+    const fruitTags = [];
+    const groupTags = [];
     
     allTags.forEach(tag => {
         const text = getTagText(tag);
@@ -1040,12 +1093,8 @@ function autoSortTags() {
             groupTags.push(tag);
         }
     });
-
-    // Sort each group separately
-    fruitTags.sort((a, b) => getTagText(a).localeCompare(getTagText(b)));
-    groupTags.sort((a, b) => getTagText(a).localeCompare(getTagText(b)));
     
-    // Combine with fruit tags first, then group tags
+    // Combine with fruit tags first, then group tags (both already sorted alphabetically)
     const tags = [...fruitTags, ...groupTags];
 
     let pos = { top: START_OFFSET, right: START_OFFSET, bottom: START_OFFSET, left: START_OFFSET };
@@ -1053,54 +1102,135 @@ function autoSortTags() {
 
     tags.forEach((tag, index) => {
         const text = getTagText(tag);
-        const isSecondary = tag.classList.contains('secondary-tag');
+        const wasSecondary = tag.classList.contains('secondary-tag');
+        const isGroupTag = index >= fruitTags.length; // Determine if this is a group tag (now comes last)
+        
+        // Mark group tags with data attribute
+        if (isGroupTag) {
+            tag.dataset.isGroup = 'true';
+        } else {
+            tag.dataset.isGroup = 'false';
+        }
+        
+        // Detect which side secondary tag was on (for left/right styling)
+        let tagSide = null;
+        if (wasSecondary) {
+            // Check the actual position of the tag to determine which side it was on
+            const tagRect = tag.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            const leftDist = tagRect.left - containerRect.left;
+            const rightDist = containerRect.right - tagRect.right;
+            const topDist = tagRect.top - containerRect.top;
+            const bottomDist = containerRect.bottom - tagRect.bottom;
+            
+            // Determine side based on smallest distance to edge
+            const minDist = Math.min(leftDist, rightDist, topDist, bottomDist);
+            
+            if (minDist === leftDist && leftDist < 50) tagSide = 'left';
+            else if (minDist === rightDist && rightDist < 50) tagSide = 'right';
+            else if (minDist === topDist && topDist < 50) tagSide = 'top';
+            else if (minDist === bottomDist && bottomDist < 50) tagSide = 'bottom';
+            
+            // Store the side for reference
+            tag.dataset.side = tagSide || '';
+        } else if (tag.dataset.side) {
+            // Use stored side information if available
+            tagSide = tag.dataset.side;
+        }
+        
+        // Disconnect from popup's secondaryTag reference BEFORE converting class
+        let popup = null;
+        if (tag.classList.contains('secondary-tag')) {
+            popup = Array.from(container.querySelectorAll('.Chatpopup'))
+                .find(p => p.secondaryTag === tag);
+            if (popup) {
+                popup.secondaryTag = null;
+                popup.secondaryTagSide = null;
+            }
+            
+            // Convert all secondary tags to border-tag class for uniform sorting
+            // Remove secondary-tag class first, then add border-tag
+            tag.classList.remove('secondary-tag');
+            tag.classList.add('border-tag');
+            
+            // Force reset styling by clearing inline styles that may be from secondary-tag
+            tag.style.zIndex = '9999';
+            tag.style.pointerEvents = 'auto';
+        }
         
         // Add separator gap before switching from fruit to group tags
         if (index === fruitTags.length && fruitTags.length > 0 && groupTags.length > 0) {
+            // Add extra gap between fruit and group tags
             pos.top += SEPARATOR_GAP;
             pos.right += SEPARATOR_GAP;
             pos.bottom += SEPARATOR_GAP;
             pos.left += SEPARATOR_GAP;
         }
-        
-        let side = null;
-        if (isSecondary) {
-            if (tag.style.left && parseFloat(tag.style.left) <= 10) side = 'left';
-            else if (tag.style.right && parseFloat(tag.style.right) <= 10) side = 'right';
-            else if (tag.style.top && parseFloat(tag.style.top) <= 10) side = 'top';
-            else if (tag.style.bottom && parseFloat(tag.style.bottom) <= 10) side = 'bottom';
-        }
-        tag.dataset.side = side || '';
 
         if (!tag.dataset.originalText) tag.dataset.originalText = text;
 
         const oldCloseBtn = tag.querySelector('span');
-        if (oldCloseBtn) oldCloseBtn.remove();
-
+        
+        // Save the close button before clearing content
+        let closeBtn = oldCloseBtn;
+        
+        // Clear only the text content, not the entire innerHTML
+        if (oldCloseBtn) {
+            oldCloseBtn.remove();
+        }
+        
         tag.innerHTML = '';
-        tag.style.whiteSpace = 'nowrap';
+        tag.style.whiteSpace = (tagSide === 'left' || tagSide === 'right') ? 'pre-line' : 'nowrap';
         tag.style.textAlign = 'center';
-        tag.innerHTML = (isSecondary && (tag.dataset.side === 'left' || tag.dataset.side === 'right')) ? 
-                        [...text].join('\n') : text;
+        tag.innerHTML = (tagSide === 'left' || tagSide === 'right') ? [...text].join('\n') : text;
 
-        const closeBtn = createCloseButton();
-        // For left side tags, swap close button and title positions
-        if (tag.dataset.side === 'left') {
+        // IMPORTANT: Reset all styling to default for border-tag appearance
+        tag.style.background = '';
+        tag.style.color = '';
+        tag.style.border = '';
+        tag.style.borderRadius = '';
+        tag.setAttribute('class', 'border-tag'); // Ensure only border-tag class
+
+        closeBtn = oldCloseBtn || createCloseButton();
+        
+        // Apply proper padding based on the side the tag will be placed on
+        // For left and right side tags, use left-aligned padding
+        if (tagSide === 'left' || tagSide === 'right') {
             closeBtn.style.right = "auto";
             closeBtn.style.left = "2px";
+            tag.style.padding = '4px 6px 4px 20px'; // Left/right side padding
+        } else {
+            // For top and bottom tags, use normal padding
+            tag.style.padding = '4px 20px 4px 6px'; // Top/bottom padding
         }
+        
         tag.appendChild(closeBtn);
 
-        const popup = Array.from(container.querySelectorAll('.Chatpopup'))
-            .find(p => p.querySelector('.popup-title')?.innerText.trim() === text);
+        if (!popup) {
+            popup = Array.from(container.querySelectorAll('.Chatpopup'))
+                .find(p => p.querySelector('.popup-title')?.innerText.trim() === text);
+        }
 
-        if (isSecondary && popup) {
+        // Apply popup header colors to all tags AND ensure consistent behavior
+        if (popup) {
             const header = popup.querySelector('.Chatpopup-header');
             if (header) {
                 tag.style.background = header.style.background;
                 tag.style.color = header.style.color;
                 tag.style.border = "1px solid " + header.style.background;
                 tag.style.borderRadius = "3px";
+            }
+            
+            // CONSISTENT BEHAVIOR FOR ALL TAGS (border tags and converted secondary tags):
+            // 1. Hide the popup
+            popup.style.display = 'none';
+            popup.closedByTag = true;
+            
+            // 2. Clear any secondary tag reference (if it exists)
+            if (popup.secondaryTag) {
+                popup.secondaryTag = null;
+                popup.secondaryTagSide = null;
             }
         }
 
@@ -1111,63 +1241,29 @@ function autoSortTags() {
             saveState();
         };
 
-        if (isSecondary && popup) {
-            popup.style.display = 'none';
-            popup.closedByTag = true;
-            popup.secondaryTag = tag;
-            popup.secondaryTagSide = tag.dataset.side;
-
-            tag.onclick = () => {
+        // All tags behave like border tags
+        tag.onclick = () => {
+            tag.remove();
+            if (popup) {
                 popup.style.display = 'block';
                 popup.closedByTag = false;
-                tag.remove();
-                
-                if (popup.secondaryTag && popup.secondaryTag !== tag) popup.secondaryTag.remove();
-                popup.secondaryTag = null;
-                popup.secondaryTagSide = null;
-                
-                const pRect = popup.getBoundingClientRect();
-                const isAtLeftBorder = popup.offsetLeft <= 0;
-                const isAtRightBorder = popup.offsetLeft + pRect.width >= rect.width;
-                const isAtTopBorder = popup.offsetTop <= 0;
-                const isAtBottomBorder = popup.offsetTop + pRect.height >= rect.height;
-                
-                if (isAtLeftBorder || isAtRightBorder || isAtTopBorder || isAtBottomBorder) {
-                    let newSide = null;
-                    if (isAtLeftBorder) newSide = "right";
-                    else if (isAtRightBorder) newSide = "left";
-                    else if (isAtTopBorder) newSide = "bottom";
-                    else if (isAtBottomBorder) newSide = "top";
-                    
-                    popup.secondaryTag = createSecondaryTag(popup, newSide);
-                    popup.secondaryTagSide = newSide;
-                }
-                saveState();
-            };
-        } else if (!isSecondary && popup) {
-            popup.style.display = 'none';
-            popup.closedByTag = true;
-            
-            tag.onclick = () => {
-                tag.remove();
-                popup.style.display = 'block';
-                popup.closedByTag = false;
-                
-                if (popup.secondaryTag) {
-                    popup.secondaryTag.remove();
-                    popup.secondaryTag = null;
-                    popup.secondaryTagSide = null;
-                }
-                
                 const pos = findFirstEmptyGridSlot(popup);
                 popup.style.left = pos.left + "px";
                 popup.style.top = pos.top + "px";
-                saveState();
-            };
-        }
+            }
+            saveState();
+        };
 
         // Clockwise placement - simple sequential without jumping
         if (pos.top + tag.offsetWidth <= rect.width - START_OFFSET) {
+            // TOP border - format as horizontal text
+            tag.textContent = text;
+            tag.style.whiteSpace = 'nowrap';
+            closeBtn.style.right = '4px';
+            closeBtn.style.left = 'auto';
+            tag.style.padding = '4px 20px 4px 6px';
+            tag.appendChild(closeBtn);
+            
             tag.style.top = '1px';
             tag.style.left = pos.top + 'px';
             tag.style.right = tag.style.bottom = '';
@@ -1175,16 +1271,15 @@ function autoSortTags() {
             return;
         }
 
-        tag.innerHTML = [...text].join('\n');
-        // For left side tags, swap close button and title positions
-        if (tag.dataset.side === 'left') {
-            closeBtn.style.right = "auto";
-            closeBtn.style.left = "2px";
-        }
-        tag.appendChild(closeBtn);
-        tag.style.whiteSpace = 'pre-line';
-
         if (pos.right + tag.offsetHeight <= rect.height - START_OFFSET) {
+            // RIGHT border - format as vertical text
+            tag.textContent = [...text].join('\n');
+            tag.style.whiteSpace = 'pre-line';
+            closeBtn.style.right = 'auto';
+            closeBtn.style.left = '2px';
+            tag.style.padding = '4px 6px 4px 20px';
+            tag.appendChild(closeBtn);
+            
             tag.style.right = TAG_GAP + 'px';
             tag.style.top = pos.right + 'px';
             tag.style.left = tag.style.bottom = '';
@@ -1192,11 +1287,15 @@ function autoSortTags() {
             return;
         }
 
-        tag.innerHTML = text;
-        tag.appendChild(closeBtn);
-        tag.style.whiteSpace = 'nowrap';
-
         if (pos.bottom + tag.offsetWidth <= rect.width - START_OFFSET) {
+            // BOTTOM border - format as horizontal text
+            tag.textContent = text;
+            tag.style.whiteSpace = 'nowrap';
+            closeBtn.style.right = '4px';
+            closeBtn.style.left = 'auto';
+            tag.style.padding = '4px 20px 4px 6px';
+            tag.appendChild(closeBtn);
+            
             tag.style.bottom = TAG_GAP + 'px';
             tag.style.left = pos.bottom + 'px';
             tag.style.top = tag.style.right = '';
@@ -1204,19 +1303,37 @@ function autoSortTags() {
             return;
         }
 
-        tag.innerHTML = [...text].join('\n');
-        tag.appendChild(closeBtn);
-        tag.style.whiteSpace = 'pre-line';
-
         if (pos.left + tag.offsetHeight <= rect.height - START_OFFSET) {
+            // LEFT border - format as vertical text
+            tag.textContent = [...text].join('\n');
+            tag.style.whiteSpace = 'pre-line';
+            closeBtn.style.right = 'auto';
+            closeBtn.style.left = '2px';
+            tag.style.padding = '4px 6px 4px 20px';
+            tag.appendChild(closeBtn);
+            
             tag.style.left = TAG_GAP + 'px';
             tag.style.top = pos.left + 'px';
             tag.style.right = tag.style.bottom = '';
-            // For left side tags, apply swapped padding
-            tag.style.paddingLeft = '20px';
-            tag.style.paddingRight = '6px';
-            tag.dataset.side = 'left';
             pos.left += tag.offsetHeight + TAG_GAP;
+        }
+    });
+    
+    // Final pass: ensure all visible tags have their associated popups hidden
+    const visibleTags = Array.from(tagContainer.querySelectorAll('.border-tag'))
+        .filter(tag => tag.style.display !== 'none');
+    
+    visibleTags.forEach(tag => {
+        const text = (tag.dataset.originalText || tag.innerText.replace(/\n/g, '').replace('×', '')).trim();
+        const associatedPopup = Array.from(container.querySelectorAll('.Chatpopup'))
+            .find(p => {
+                const titleEl = p.querySelector('.popup-title');
+                return titleEl && titleEl.innerText.trim() === text;
+            });
+        
+        if (associatedPopup) {
+            associatedPopup.style.display = 'none';
+            associatedPopup.closedByTag = true;
         }
     });
 }
@@ -1233,7 +1350,6 @@ let resizeTimeout;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-        repositionPopupsOnResize();
         repositionTagsOnResize();
         saveState();
     }, 100);
@@ -1369,6 +1485,43 @@ function repositionTagsOnResize() {
         }
     });
 }
+
+
+function syncSecondaryTagsOnScroll() {
+    const rect = container.getBoundingClientRect();
+
+    const popups = Array.from(container.querySelectorAll('.Chatpopup'));
+
+    popups.forEach(popup => {
+        if (!popup.secondaryTag || popup.style.display === 'none') return;
+
+        const tag = popup.secondaryTag;
+        const side = popup.secondaryTagSide;
+        if (!side) return;
+
+        const pRect = popup.getBoundingClientRect();
+        const tagWidth = tag.offsetWidth;
+        const tagHeight = tag.offsetHeight;
+
+        const left = pRect.left - rect.left;
+        const top = pRect.top - rect.top;
+
+        const positions = {
+            right:  { left: left + pRect.width, top },
+            left:   { left: left - tagWidth, top },
+            bottom: { left, top: top + pRect.height },
+            top:    { left, top: top - tagHeight }
+        };
+
+        tag.style.left = positions[side].left + "px";
+        tag.style.top  = positions[side].top + "px";
+    });
+}
+
+container.addEventListener('scroll', () => {
+    syncSecondaryTagsOnScroll();
+});
+
 
  //  REMOVE OLD MEMORY ON EVERY PAGE LOAD
 localStorage.removeItem('chatPopupState');

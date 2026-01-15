@@ -12,11 +12,13 @@
 .popupscrollarea {
     position: absolute;
     inset: 0;
-    top: 35px; /* Leave space for chatWrapper */
+    top: 1px; /* Leave space for chatWrapper */
     overflow-y: auto;
     overflow-x: hidden;
     z-index: 0;
 }
+
+
 
 .chatWrapper {
   position: absolute;
@@ -116,10 +118,18 @@
     white-space: nowrap;
     font-size: 15px;
     z-index: 1000;
+    border: 1px solid black;
 }
 
 .secondary-tag.dragging {
     z-index: 1001;
+}
+
+/* When secondary tags are converted to border-tag, reset their styling */
+.border-tag {
+    background: #333;
+    color: #fff;
+    border-radius: 4px;
 }
 
 
@@ -193,4 +203,10 @@
 
 .popup-close {
     color: white;
+}
+
+.border-tag,
+.secondary-tag {
+    z-index: 9999;
+    pointer-events: auto;
 }
