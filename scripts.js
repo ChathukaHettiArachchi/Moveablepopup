@@ -1097,7 +1097,7 @@ function autoSortTags() {
     // Combine with fruit tags first, then group tags (both already sorted alphabetically)
     const tags = [...fruitTags, ...groupTags];
 
-    let pos = { top: START_OFFSET, right: START_OFFSET, bottom: START_OFFSET, left: START_OFFSET };
+    let pos = { top: START_OFFSET, right: START_OFFSET, bottom: 5, left: START_OFFSET };
     let tagCategoryIndex = 0;
 
     tags.forEach((tag, index) => {
@@ -1255,68 +1255,85 @@ function autoSortTags() {
         };
 
         // Clockwise placement - simple sequential without jumping
-        if (pos.top + tag.offsetWidth <= rect.width - START_OFFSET) {
-            // TOP border - format as horizontal text
-            tag.textContent = text;
-            tag.style.whiteSpace = 'nowrap';
-            closeBtn.style.right = '4px';
-            closeBtn.style.left = 'auto';
-            tag.style.padding = '4px 20px 4px 6px';
-            tag.appendChild(closeBtn);
-            
-            tag.style.top = '1px';
-            tag.style.left = pos.top + 'px';
-            tag.style.right = tag.style.bottom = '';
-            pos.top += tag.offsetWidth + TAG_GAP;
-            return;
-        }
+        // TOP → left to right
+if (pos.top + tag.offsetWidth <= rect.width - START_OFFSET) {
+    tag.textContent = text;
+    tag.appendChild(closeBtn);
+    tag.style.whiteSpace = 'nowrap';
+    closeBtn.style.right = '4px';
+    closeBtn.style.left = 'auto';
+    tag.style.padding = '4px 20px 4px 6px';
 
-        if (pos.right + tag.offsetHeight <= rect.height - START_OFFSET) {
-            // RIGHT border - format as vertical text
-            tag.textContent = [...text].join('\n');
-            tag.style.whiteSpace = 'pre-line';
-            closeBtn.style.right = 'auto';
-            closeBtn.style.left = '2px';
-            tag.style.padding = '4px 6px 4px 20px';
-            tag.appendChild(closeBtn);
-            
-            tag.style.right = TAG_GAP + 'px';
-            tag.style.top = pos.right + 'px';
-            tag.style.left = tag.style.bottom = '';
-            pos.right += tag.offsetHeight + TAG_GAP;
-            return;
-        }
+    tag.style.top = '1px';
+    tag.style.left = pos.top + 'px';
+    tag.style.right = tag.style.bottom = '';
+    
+    // Check if tag would be cropped on the right
+    if (pos.top + tag.offsetWidth <= rect.width - 20) {
+        pos.top += tag.offsetWidth + TAG_GAP;
+        return;
+    }
+}
 
-        if (pos.bottom + tag.offsetWidth <= rect.width - START_OFFSET) {
-            // BOTTOM border - format as horizontal text
-            tag.textContent = text;
-            tag.style.whiteSpace = 'nowrap';
-            closeBtn.style.right = '4px';
-            closeBtn.style.left = 'auto';
-            tag.style.padding = '4px 20px 4px 6px';
-            tag.appendChild(closeBtn);
-            
-            tag.style.bottom = TAG_GAP + 'px';
-            tag.style.left = pos.bottom + 'px';
-            tag.style.top = tag.style.right = '';
-            pos.bottom += tag.offsetWidth + TAG_GAP;
-            return;
-        }
+// RIGHT → top to bottom
+if (pos.right + tag.offsetHeight <= rect.height - START_OFFSET) {
+    tag.textContent = [...text].join('\n');
+    tag.appendChild(closeBtn);
+    tag.style.whiteSpace = 'pre-line';
+    closeBtn.style.right = 'auto';
+    closeBtn.style.left = '2px';
+    tag.style.padding = '4px 6px 4px 20px';
 
-        if (pos.left + tag.offsetHeight <= rect.height - START_OFFSET) {
-            // LEFT border - format as vertical text
-            tag.textContent = [...text].join('\n');
-            tag.style.whiteSpace = 'pre-line';
-            closeBtn.style.right = 'auto';
-            closeBtn.style.left = '2px';
-            tag.style.padding = '4px 6px 4px 20px';
-            tag.appendChild(closeBtn);
-            
-            tag.style.left = TAG_GAP + 'px';
-            tag.style.top = pos.left + 'px';
-            tag.style.right = tag.style.bottom = '';
-            pos.left += tag.offsetHeight + TAG_GAP;
-        }
+    tag.style.right = TAG_GAP + 'px';
+    tag.style.top = pos.right + 'px';
+    tag.style.left = tag.style.bottom = '';
+    
+    // Check if tag would be cropped on the bottom
+    if (pos.right + tag.offsetHeight <= rect.height - 20) {
+        pos.right += tag.offsetHeight + TAG_GAP;
+        return;
+    }
+}
+
+// BOTTOM → right to left
+if (pos.bottom + tag.offsetWidth <= rect.width - START_OFFSET) {
+    tag.textContent = text;
+    tag.appendChild(closeBtn);
+    tag.style.whiteSpace = 'nowrap';
+    closeBtn.style.right = '4px';
+    closeBtn.style.left = 'auto';
+    tag.style.padding = '4px 20px 4px 6px';
+
+    tag.style.bottom = TAG_GAP + 'px';
+    tag.style.left = (rect.width - START_OFFSET - pos.bottom - tag.offsetWidth) + 'px';
+    tag.style.top = tag.style.right = '';
+    
+    // Check if tag would be cropped on the left
+    if ((rect.width - START_OFFSET - pos.bottom - tag.offsetWidth) >= 20) {
+        pos.bottom += tag.offsetWidth + TAG_GAP;
+        return;
+    }
+}
+
+// LEFT → bottom to top
+if (pos.left + tag.offsetHeight <= rect.height - START_OFFSET) {
+    tag.textContent = [...text].join('\n');
+    tag.appendChild(closeBtn);
+    tag.style.whiteSpace = 'pre-line';
+    closeBtn.style.right = '4px';
+    closeBtn.style.left = 'auto';
+    tag.style.padding = '4px 20px 4px 6px';
+
+    tag.style.left = TAG_GAP + 'px';
+    tag.style.top = (rect.height - START_OFFSET - pos.left - tag.offsetHeight) + 'px';
+    tag.style.right = tag.style.bottom = '';
+    
+    // Check if tag would be cropped on the top
+    if ((rect.height - START_OFFSET - pos.left - tag.offsetHeight) >= 20) {
+        pos.left += tag.offsetHeight + TAG_GAP;
+        return;
+    }
+}
     });
     
     // Final pass: ensure all visible tags have their associated popups hidden
