@@ -1541,5 +1541,5 @@ container.addEventListener('scroll', () => {
 
 
  //  REMOVE OLD MEMORY ON EVERY PAGE LOAD
-localStorage.removeItem('chatPopupState');
-console.log("Previous popup memory cleared!");
+// localStorage.removeItem('chatPopupState');
+// console.log("Previous popup memory cleared!");
